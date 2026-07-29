@@ -1,0 +1,16 @@
+{
+  "suspicious_names": [
+    "nc", "ncat", "netcat", "socat",
+    "mimikatz", "meterpreter",
+    "xmrig", "minerd", "cpuminer",
+    "nmap", "hydra", "sqlmap",
+    "powershell_ise", "certutil"
+  ],
+  "suspicious_paths": [
+    "/tmp/",
+    "/dev/shm/",
+    "/var/tmp/"
+  ],
+  "max_cpu_percent": 90,
+  "max_children": 20
+}

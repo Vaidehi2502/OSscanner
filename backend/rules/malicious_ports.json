@@ -1,0 +1,14 @@
+{
+  "known_malicious_ports": [
+    { "port": 4444, "desc": "Common Metasploit default listener" },
+    { "port": 1337, "desc": "Common backdoor/leet port" },
+    { "port": 31337, "desc": "Back Orifice / classic backdoor port" },
+    { "port": 6667, "desc": "IRC - common botnet C2 channel" },
+    { "port": 12345, "desc": "NetBus trojan default port" },
+    { "port": 6666, "desc": "Common trojan/backdoor port" },
+    { "port": 5555, "desc": "Android Debug Bridge / malware port" }
+  ],
+  "watch_ranges": [
+    { "start": 49152, "end": 65535, "desc": "Ephemeral range - flag if unexpectedly listening" }
+  ]
+}

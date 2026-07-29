@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Database
+backend/database/scans.db
+
+# Generated reports
+backend/reports/generated/
+
+# Node / React
+frontend/node_modules/
+frontend/build/
+
+# OS
+.DS_Store
