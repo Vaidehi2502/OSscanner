@@ -10,6 +10,13 @@ KNOWN_SUID_BASENAMES = {
     "mount", "umount", "ping", "ping6", "pkexec", "fusermount", "fusermount3",
 }
 
+# Binaries that legitimately carry the SGID bit on most distros (shadow/crontab
+# group tools, ssh-agent, mail delivery helpers).
+KNOWN_SGID_BASENAMES = {
+    "chage", "crontab", "expiry", "pam_extrausers_chkpwd", "unix_chkpwd",
+    "ssh-agent", "wall", "write", "postdrop", "postqueue",
+}
+
 
 def _walk_limited(directory, max_entries=5000):
     count = 0
@@ -45,12 +52,23 @@ def scan():
                     "evidence": {"path": path, "mode": oct(mode)},
                 })
 
-            if (mode & stat.S_ISUID) and os.path.basename(path) not in KNOWN_SUID_BASENAMES:
+            basename = os.path.basename(path)
+
+            if (mode & stat.S_ISUID) and basename not in KNOWN_SUID_BASENAMES:
                 findings.append({
                     "scanner": "permission_scanner",
                     "severity": "high",
                     "title": f"Unexpected SUID binary: {path}",
                     "description": "Binary runs with owner privileges and is not a commonly known SUID tool.",
+                    "evidence": {"path": path, "mode": oct(mode)},
+                })
+
+            if (mode & stat.S_ISGID) and basename not in KNOWN_SGID_BASENAMES:
+                findings.append({
+                    "scanner": "permission_scanner",
+                    "severity": "high",
+                    "title": f"Unexpected SGID binary: {path}",
+                    "description": "Binary runs with group privileges and is not a commonly known SGID tool.",
                     "evidence": {"path": path, "mode": oct(mode)},
                 })
 
