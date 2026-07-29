@@ -11,12 +11,8 @@ WATCHED_DIRS = ["/tmp", "/var/tmp", "/dev/shm"]
 RECENT_SECONDS = 24 * 60 * 60
 
 
-def _is_executable(path):
-    try:
-        mode = os.stat(path).st_mode
-        return bool(mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
-    except OSError:
-        return False
+def _is_executable(mode):
+    return bool(mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
 
 
 def scan():
@@ -31,12 +27,21 @@ def scan():
             for name in files:
                 path = os.path.join(root, name)
                 try:
-                    mtime = os.path.getmtime(path)
+                    st = os.stat(path)
                 except OSError:
                     continue
 
+                # Temp dirs are full of non-regular files with wide-open
+                # permission bits - X11/ICE Unix sockets in particular are
+                # commonly created as srwxrwxrwx. Without this check every
+                # desktop session's own sockets get misidentified as
+                # dropped executables.
+                if not stat.S_ISREG(st.st_mode):
+                    continue
+
+                mtime = st.st_mtime
                 recent = (now - mtime) <= RECENT_SECONDS
-                executable = _is_executable(path)
+                executable = _is_executable(st.st_mode)
 
                 if executable and recent:
                     findings.append({

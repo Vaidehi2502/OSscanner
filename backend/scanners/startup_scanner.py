@@ -3,7 +3,10 @@ import glob
 import os
 import subprocess
 
-CRON_PATHS = ["/etc/crontab", "/etc/cron.d", "/var/spool/cron/crontabs"]
+# /var/spool/cron/crontabs is where Debian/Ubuntu keep per-user crontabs;
+# RHEL/CentOS/Fedora use /var/spool/cron directly instead. Both are listed
+# so per-user crontabs aren't missed depending on distro.
+CRON_PATHS = ["/etc/crontab", "/etc/cron.d", "/var/spool/cron/crontabs", "/var/spool/cron"]
 SHELL_PROFILES = ["~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc"]
 AUTOSTART_GLOBS = ["/etc/xdg/autostart/*.desktop", "~/.config/autostart/*.desktop"]
 
@@ -13,7 +16,11 @@ def _read_cron_entries():
     for cron_path in CRON_PATHS:
         if os.path.isdir(cron_path):
             for f in glob.glob(os.path.join(cron_path, "*")):
-                entries.append(f)
+                # On Debian/Ubuntu, /var/spool/cron is a directory that
+                # itself contains "crontabs" - without this check that
+                # subdirectory would be listed as if it were a cron file.
+                if os.path.isfile(f):
+                    entries.append(f)
         elif os.path.isfile(cron_path):
             entries.append(cron_path)
     return entries
