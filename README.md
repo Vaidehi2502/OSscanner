@@ -2,11 +2,11 @@
 
 ![CI](https://github.com/Vaidehi2502/OSscanner/actions/workflows/ci.yml/badge.svg)
 
-A local security posture scanner. The backend runs a set of scanners against
-the host machine (processes, network connections, listening ports, startup
-persistence, file permissions, auth logs, user accounts), scores the combined
-findings, stores results in SQLite, and can export a PDF report. The frontend
-is a small React dashboard that triggers scans and displays results.
+Inspects core OS state - running processes, network connections, listening
+ports, startup persistence, authentication logs, file permissions, and user
+accounts - to surface security risks and misconfigurations. Findings are
+correlated into a unified risk score, stored as historical scans in SQLite,
+and presented through a React dashboard with downloadable PDF reports.
 
 ## Project layout
 
