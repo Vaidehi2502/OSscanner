@@ -139,8 +139,17 @@ pip install pytest
 pytest tests/ -v
 ```
 
-CI runs this same command on every push/PR via
-`.github/workflows/ci.yml`.
+```bash
+cd frontend
+npm install
+CI=true npm test -- --watchAll=false
+```
+
+CI runs both of these on every push/PR via `.github/workflows/ci.yml`.
+Frontend tests use Jest (via `react-scripts test`) and React Testing
+Library; `App.test.js` mocks `./api` so component tests don't depend on a
+running backend, while `api.test.js` mocks `fetch` directly to test the
+request/auth-header/PDF-download logic in `api.js` itself.
 
 ## Running the frontend
 
