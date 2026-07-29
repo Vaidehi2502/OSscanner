@@ -4,9 +4,15 @@ import re
 from collections import Counter
 
 LOG_CANDIDATES = ["/var/log/auth.log", "/var/log/secure"]
+# Character class covers both IPv4 (digits/dots) and IPv6 (hex groups/colons) -
+# a digits-only class truncated IPv6 addresses to their first hex group,
+# e.g. "2001:db8::1" was captured as just "2001".
 FAILED_LOGIN_PATTERNS = [
-    re.compile(r"Failed password for .* from (?P<ip>[\d.]+)"),
-    re.compile(r"authentication failure.*rhost=(?P<ip>[\d.]+)"),
+    re.compile(r"Failed password for .* from (?P<ip>[0-9a-fA-F.:]+)"),
+    re.compile(r"authentication failure.*rhost=(?P<ip>[0-9a-fA-F.:]+)"),
+]
+ROOT_LOGIN_PATTERNS = [
+    re.compile(r"Accepted \S+ for root from"),
 ]
 FAILED_THRESHOLD = 5
 TAIL_LINES = 5000
@@ -37,7 +43,13 @@ def scan():
             if match:
                 failed_by_ip[match.group("ip")] += 1
 
-        if "Accepted password for root" in line or "session opened for user root" in line:
+        # Matches interactive authentication as root only (password or
+        # publickey). Deliberately does NOT match generic PAM "session
+        # opened for user root" lines - those also fire for routine,
+        # non-interactive root activity like cron jobs, which on a typical
+        # system vastly outnumber real root logins and would drown any
+        # real signal in noise.
+        if any(pattern.search(line) for pattern in ROOT_LOGIN_PATTERNS):
             accepted_new_user.append(line.strip())
 
     for ip, count in failed_by_ip.items():
