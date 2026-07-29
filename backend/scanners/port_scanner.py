@@ -20,7 +20,13 @@ def _load_rules():
 def _listening_ports_psutil():
     ports = []
     for conn in psutil.net_connections(kind="inet"):
-        if conn.status == psutil.CONN_LISTEN or conn.type == 2:  # SOCK_DGRAM has no LISTEN state
+        is_listening_tcp = conn.status == psutil.CONN_LISTEN
+        # UDP has no LISTEN state - a bound-but-unconnected socket (no raddr)
+        # is the closest equivalent to "listening"; a socket with a raddr is
+        # an established outbound flow (e.g. DNS/DHCP client traffic), not a
+        # service accepting inbound connections, and must not be flagged.
+        is_bound_udp = conn.type == 2 and not conn.raddr
+        if is_listening_tcp or is_bound_udp:
             ports.append({"port": conn.laddr.port, "pid": conn.pid, "proto": "tcp" if conn.type == 1 else "udp"})
     return ports
 

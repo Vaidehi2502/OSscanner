@@ -5,7 +5,29 @@ subprocess call and `scan()`'s port source are both monkeypatched with
 canned data, so results are deterministic regardless of what's actually
 listening on the machine running the tests.
 """
+from collections import namedtuple
+
+import psutil
+
 import scanners.port_scanner as port_scanner
+
+_Addr = namedtuple("addr", ["ip", "port"])
+_Conn = namedtuple("sconn", ["fd", "family", "type", "laddr", "raddr", "status", "pid"])
+
+
+def _tcp_listen(port, pid=123):
+    return _Conn(0, 2, 1, _Addr("0.0.0.0", port), (), psutil.CONN_LISTEN, pid)
+
+
+def _udp_bound(port, pid=None):
+    """An unconnected/bound UDP socket - the real equivalent of "listening"."""
+    return _Conn(0, 2, 2, _Addr("0.0.0.0", port), (), "NONE", pid)
+
+
+def _udp_connected(local_port, pid=None):
+    """A UDP socket connected to a remote peer (e.g. outbound DNS/DHCP
+    traffic) - must NOT be treated as a listening/exposed service."""
+    return _Conn(0, 2, 2, _Addr("0.0.0.0", local_port), _Addr("1.2.3.4", 53), "NONE", pid)
 
 # A representative `ss -tuln` output: header row, IPv4 tcp/udp listeners,
 # an IPv6 listener, and a malformed short line that should be skipped.
@@ -66,6 +88,29 @@ def test_scan_ignores_benign_port(monkeypatch):
         monkeypatch, [{"port": 80, "pid": None, "proto": "tcp"}]
     )
     assert findings == []
+
+
+def test_listening_ports_psutil_includes_tcp_listen_and_bound_udp(monkeypatch):
+    monkeypatch.setattr(port_scanner, "HAVE_PSUTIL", True)
+    conns = [_tcp_listen(22), _udp_bound(53)]
+    monkeypatch.setattr(port_scanner.psutil, "net_connections", lambda kind: conns)
+
+    ports = port_scanner._listening_ports_psutil()
+    assert {"port": 22, "pid": 123, "proto": "tcp"} in ports
+    assert {"port": 53, "pid": None, "proto": "udp"} in ports
+    assert len(ports) == 2
+
+
+def test_listening_ports_psutil_excludes_connected_udp_socket(monkeypatch):
+    # Regression test: a UDP socket connected to a remote peer (e.g. the
+    # local end of an outbound DNS/DHCP request) is not a listening service
+    # and must not show up as one, even though UDP has no LISTEN state.
+    monkeypatch.setattr(port_scanner, "HAVE_PSUTIL", True)
+    conns = [_udp_connected(local_port=58806)]
+    monkeypatch.setattr(port_scanner.psutil, "net_connections", lambda kind: conns)
+
+    ports = port_scanner._listening_ports_psutil()
+    assert ports == []
 
 
 def test_scan_dedupes_repeated_port(monkeypatch):
