@@ -6,6 +6,9 @@ import app as app_module
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module.db, "DB_PATH", str(tmp_path / "scans.db"))
+    # Baseline: no API key configured, regardless of the host environment,
+    # so tests are deterministic and auth-specific tests can opt in explicitly.
+    monkeypatch.delenv("API_KEY", raising=False)
     app_module.db.init_db()
     app_module.app.testing = True
     return app_module.app.test_client()
@@ -39,3 +42,36 @@ def test_cors_rejects_arbitrary_origin(client):
     # reading the response even though the request itself still goes through.
     resp = client.get("/api/health", headers={"Origin": "http://evil.example"})
     assert "Access-Control-Allow-Origin" not in resp.headers
+
+
+def test_requests_unauthenticated_when_no_api_key_configured(client):
+    # Documents the opt-in nature of auth: with no API_KEY set (the
+    # fixture's baseline), endpoints work without any header at all.
+    resp = client.get("/api/scans")
+    assert resp.status_code == 200
+
+
+def test_requires_api_key_when_configured(client, monkeypatch):
+    monkeypatch.setenv("API_KEY", "test-secret-key")
+    resp = client.get("/api/scans")
+    assert resp.status_code == 401
+
+
+def test_accepts_correct_api_key(client, monkeypatch):
+    monkeypatch.setenv("API_KEY", "test-secret-key")
+    resp = client.get("/api/scans", headers={"X-API-Key": "test-secret-key"})
+    assert resp.status_code == 200
+
+
+def test_rejects_wrong_api_key(client, monkeypatch):
+    monkeypatch.setenv("API_KEY", "test-secret-key")
+    resp = client.get("/api/scans", headers={"X-API-Key": "wrong-key"})
+    assert resp.status_code == 401
+
+
+def test_health_accessible_without_api_key_even_when_configured(client, monkeypatch):
+    # The health check is deliberately public even when auth is enabled,
+    # so monitoring/liveness checks don't need a key.
+    monkeypatch.setenv("API_KEY", "test-secret-key")
+    resp = client.get("/api/health")
+    assert resp.status_code == 200

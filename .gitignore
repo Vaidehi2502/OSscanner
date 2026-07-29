@@ -13,6 +13,10 @@ backend/reports/generated/
 # Node / React
 frontend/node_modules/
 frontend/build/
+frontend/.env.local
+
+# Secrets
+.env
 
 # OS
 .DS_Store

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { runScan, pdfUrl } from "./api";
+import { runScan, downloadPdf } from "./api";
 import RiskGauge from "./components/RiskGauge";
 import FindingsTable from "./components/FindingsTable";
 
@@ -18,6 +18,14 @@ export default function App() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDownload(scanId) {
+    try {
+      await downloadPdf(scanId);
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -49,14 +57,20 @@ export default function App() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <RiskGauge score={report.risk_score} level={report.risk_level} />
             {report.scan_id && (
-              <a
-                href={pdfUrl(report.scan_id)}
-                style={{ color: "#90CAF9" }}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => handleDownload(report.scan_id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#90CAF9",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                  padding: 0,
+                  font: "inherit",
+                }}
               >
                 Download report
-              </a>
+              </button>
             )}
           </div>
 

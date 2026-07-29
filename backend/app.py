@@ -6,9 +6,10 @@ Endpoints:
     GET  /api/scans/<id>       - fetch a full stored report
     GET  /api/scans/<id>/pdf   - download the report as a PDF
 """
+import hmac
 import os
 
-from flask import Flask, jsonify, send_file
+from flask import Flask, jsonify, request, send_file
 
 from scanners import run_all
 from ai.analyzer import analyze, summarize
@@ -32,6 +33,31 @@ except ImportError:
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "reports", "generated")
 os.makedirs(REPORTS_DIR, exist_ok=True)
+
+if not os.environ.get("API_KEY"):
+    print(
+        "WARNING: API_KEY is not set - all /api/* endpoints are unauthenticated. "
+        "Set API_KEY (and REACT_APP_API_KEY for the frontend) to require a key.",
+    )
+
+
+@app.before_request
+def _enforce_api_key():
+    # Read fresh per-request (not cached at import time) so it reflects the
+    # current environment rather than whatever it was when the module loaded.
+    expected_key = os.environ.get("API_KEY")
+    if not expected_key:
+        return None  # auth disabled - see startup warning
+
+    # Preflight requests don't (and can't) carry custom headers, and the
+    # health check is deliberately public so monitoring doesn't need a key.
+    if request.method == "OPTIONS" or request.path == "/api/health":
+        return None
+
+    provided_key = request.headers.get("X-API-Key", "")
+    if not hmac.compare_digest(provided_key, expected_key):
+        return jsonify({"error": "unauthorized"}), 401
+    return None
 
 
 @app.before_request

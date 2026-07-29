@@ -61,6 +61,19 @@ Do not set this to `*` - this API returns detailed system information
 (processes, users, permissions) and a wildcard origin lets any website
 open in the browser call it and read the response.
 
+By default the API has no authentication - fine for a quick local check,
+but anything reachable beyond your own machine should set an API key:
+
+```bash
+API_KEY=some-long-random-secret python3 app.py
+```
+
+When set, every `/api/*` route except `/api/health` requires a matching
+`X-API-Key` header, returning `401` otherwise. With no `API_KEY` set, a
+startup warning is printed and all endpoints stay open. The frontend
+needs the same value in `REACT_APP_API_KEY` (see below) to authenticate
+its requests.
+
 ## Running tests
 
 ```bash
@@ -84,6 +97,14 @@ npm start
 This starts the dev server on `http://localhost:3000` and proxies `/api/*`
 requests to the Flask backend on port 5000 (see `"proxy"` in
 `frontend/package.json`).
+
+If the backend has `API_KEY` set, create `frontend/.env.local` with the
+same value (Create React App only exposes env vars prefixed
+`REACT_APP_`, and only picks up changes after restarting `npm start`):
+
+```
+REACT_APP_API_KEY=some-long-random-secret
+```
 
 ## API
 
