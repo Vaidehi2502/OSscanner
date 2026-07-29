@@ -74,6 +74,62 @@ startup warning is printed and all endpoints stay open. The frontend
 needs the same value in `REACT_APP_API_KEY` (see below) to authenticate
 its requests.
 
+## Running the backend in Docker
+
+```bash
+docker build -t osscanner-backend ./backend
+docker run --rm -p 5000:5000 -e API_KEY=some-long-random-secret osscanner-backend
+```
+
+This works, but by default every scanner only sees the **container's own**
+isolated processes, network state, and filesystem - not your actual
+machine. That's fine for poking at the API, but it is not a real scan of
+your host. To make scanners see the real host:
+
+```bash
+docker run --rm \
+  --pid=host \
+  --network=host \
+  -v /var/log:/var/log:ro \
+  -v /etc/passwd:/etc/passwd:ro \
+  -v /etc/shadow:/etc/shadow:ro \
+  -v /etc/crontab:/etc/crontab:ro \
+  -v /etc/cron.d:/etc/cron.d:ro \
+  -v /etc/xdg/autostart:/etc/xdg/autostart:ro \
+  -v /tmp:/tmp \
+  -v /var/tmp:/var/tmp \
+  -v /dev/shm:/dev/shm \
+  -e API_KEY=some-long-random-secret \
+  osscanner-backend
+```
+
+- `--pid=host` + `--network=host` give `process_scanner`, `network_scanner`,
+  and `port_scanner` a real view of host processes/connections/ports.
+- The bind mounts give `log_scanner`, `user_scanner`, and the cron/autostart
+  parts of `startup_scanner` a real view, since those read fixed absolute
+  paths (e.g. `/var/log/auth.log`, `/etc/shadow`) that must exist at the
+  same path inside the container to be found at all.
+- The container runs as root by default (no `USER` directive) because
+  reading `/etc/shadow` and enumerating other users' processes needs it -
+  same tradeoff the README already notes for running natively as root.
+
+Two real gaps even with all of this:
+- **`permission_scanner` cannot see the host's real binaries.** It scans
+  `/usr/bin`, `/usr/sbin`, `/bin`, `/sbin` for SUID/SGID/world-writable
+  files - but those paths inside the container are the *container's own*
+  binaries (needed for Python etc. to keep working), not the host's.
+  Bind-mounting the host's copies over them would likely break the
+  container itself, and the scanner's target directories aren't
+  configurable via env var today, so this scanner's results only reflect
+  the container image while running this way.
+- **systemd-based enabled-service detection in `startup_scanner` generally
+  won't work** - it shells out to `systemctl`, which needs a running
+  systemd instance most containers don't have. It fails gracefully (empty
+  results, no crash) rather than erroring.
+
+If you want full, accurate host visibility, running the backend natively
+(see above) is simpler and has none of these gaps.
+
 ## Running tests
 
 ```bash
