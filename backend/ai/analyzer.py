@@ -10,7 +10,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from utils.score import score_findings, risk_level  # noqa: E402
+from utils.score import score_findings, risk_level, SEVERITY_WEIGHTS  # noqa: E402
 
 
 def _dedupe(findings):
@@ -48,7 +48,11 @@ def summarize(report):
     if report["total_findings"] == 0:
         return "No issues detected. System appears clean."
 
-    top = sorted(report["findings"], key=lambda f: f.get("severity", "low"), reverse=True)[:3]
+    top = sorted(
+        report["findings"],
+        key=lambda f: SEVERITY_WEIGHTS.get(f.get("severity", "low"), 1),
+        reverse=True,
+    )[:3]
     top_titles = "; ".join(f["title"] for f in top)
     return (
         f"Risk level: {report['risk_level'].upper()} (score {report['risk_score']}/100). "
