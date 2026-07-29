@@ -19,7 +19,14 @@ app = Flask(__name__)
 
 try:
     from flask_cors import CORS
-    CORS(app)
+    # Restrict to known frontend origin(s) - a bare CORS(app) sends
+    # Access-Control-Allow-Origin: * on every response, which lets any
+    # website open in the browser call this API from JS and read the
+    # results (system processes/users/permissions) with no interaction.
+    _allowed_origins = [
+        o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()
+    ]
+    CORS(app, resources={r"/api/*": {"origins": _allowed_origins}})
 except ImportError:
     pass  # fine for same-origin use; `pip install flask-cors` to enable cross-origin requests
 

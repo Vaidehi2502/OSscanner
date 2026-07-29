@@ -49,6 +49,18 @@ FLASK_DEBUG=1 FLASK_HOST=0.0.0.0 FLASK_PORT=5000 python3 app.py
 Only set `FLASK_DEBUG=1` or `FLASK_HOST=0.0.0.0` on a trusted network —
 Flask's debug mode exposes an interactive console that can execute code.
 
+CORS defaults to allowing only `http://localhost:3000` (the frontend dev
+server) under `/api/*`. Override with a comma-separated list if you serve
+the frontend from elsewhere:
+
+```bash
+CORS_ORIGINS=http://localhost:3000,https://your-deployed-frontend python3 app.py
+```
+
+Do not set this to `*` - this API returns detailed system information
+(processes, users, permissions) and a wildcard origin lets any website
+open in the browser call it and read the response.
+
 ## Running tests
 
 ```bash

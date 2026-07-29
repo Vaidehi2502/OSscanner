@@ -26,3 +26,16 @@ def test_list_scans_starts_empty(client):
     resp = client.get("/api/scans")
     assert resp.status_code == 200
     assert resp.get_json() == []
+
+
+def test_cors_allows_known_frontend_origin(client):
+    resp = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
+    assert resp.headers.get("Access-Control-Allow-Origin") == "http://localhost:3000"
+
+
+def test_cors_rejects_arbitrary_origin(client):
+    # A malicious/unrelated site should not get an Access-Control-Allow-Origin
+    # header back - without it, the browser blocks the site's JS from
+    # reading the response even though the request itself still goes through.
+    resp = client.get("/api/health", headers={"Origin": "http://evil.example"})
+    assert "Access-Control-Allow-Origin" not in resp.headers
