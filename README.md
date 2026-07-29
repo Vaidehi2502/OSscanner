@@ -1,4 +1,4 @@
-# SentinelOS
+# OSscanner
 
 A local security posture scanner. The backend runs a set of scanners against
 the host machine (processes, network connections, listening ports, startup
