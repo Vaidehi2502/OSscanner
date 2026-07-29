@@ -36,6 +36,10 @@ optional: scanners fall back to `/proc`/`ss`/`systemctl` parsing without
 `psutil`, and PDF generation falls back to a plain-text report without
 `reportlab`.
 
+`backend/.env.example` lists every environment variable below in one place
+(there's no dotenv loader, so it's a copy-paste reference, not something
+auto-loaded - see the comment at its top for how to actually use it).
+
 Some scanners (log_scanner, permission_scanner reading `/etc/shadow` via
 user_scanner) return more complete results when run as root.
 
@@ -163,9 +167,10 @@ This starts the dev server on `http://localhost:3000` and proxies `/api/*`
 requests to the Flask backend on port 5000 (see `"proxy"` in
 `frontend/package.json`).
 
-If the backend has `API_KEY` set, create `frontend/.env.local` with the
-same value (Create React App only exposes env vars prefixed
-`REACT_APP_`, and only picks up changes after restarting `npm start`):
+If the backend has `API_KEY` set, copy `frontend/.env.example` to
+`frontend/.env.local` and fill in the same value (Create React App only
+exposes env vars prefixed `REACT_APP_`, and only picks up changes after
+restarting `npm start`):
 
 ```
 REACT_APP_API_KEY=some-long-random-secret
