@@ -8,24 +8,22 @@ try:
 except ImportError:
     HAVE_PSUTIL = False
 
-# Private/loopback ranges are considered normal; anything else on an
-# established connection is reported at low severity for the operator to
-# triage (this scanner is intentionally conservative - it flags for review
-# rather than assuming malice).
-PRIVATE_NETS = [
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("127.0.0.0/8"),
-]
-
-
+# Private/loopback/link-local addresses are considered normal; anything
+# else on an established connection is reported at low severity for the
+# operator to triage (this scanner is intentionally conservative - it
+# flags for review rather than assuming malice).
+#
+# `ipaddress`'s built-in is_private covers IPv4 (RFC1918, loopback,
+# link-local) and IPv6 (::1, fe80::/10 link-local, fc00::/7 ULA) - an
+# earlier version of this function reimplemented an IPv4-only allowlist,
+# which meant any IPv6 loopback/link-local/ULA traffic was misclassified
+# as an external connection.
 def _is_private(ip):
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
         return True
-    return any(addr in net for net in PRIVATE_NETS)
+    return addr.is_private
 
 
 def _connections_psutil():
