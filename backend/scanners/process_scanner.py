@@ -5,6 +5,7 @@ so the scanner still works in minimal environments.
 """
 import json
 import os
+import time
 
 try:
     import psutil
@@ -14,6 +15,12 @@ except ImportError:
 
 RULES_PATH = os.path.join(os.path.dirname(__file__), "..", "rules", "suspicious_processes.json")
 
+# psutil's non-blocking cpu_percent() always returns a meaningless 0.0 on
+# the first call for a given process handle - it needs a "prime" call, a
+# gap, then a second call to measure real usage over that interval. This
+# sample window is that gap.
+CPU_SAMPLE_SECONDS = 0.2
+
 
 def _load_rules():
     with open(RULES_PATH) as f:
@@ -21,13 +28,27 @@ def _load_rules():
 
 
 def _iter_processes_psutil():
-    for proc in psutil.process_iter(["pid", "name", "exe", "cpu_percent", "cmdline"]):
-        info = proc.info
+    procs = list(psutil.process_iter(["pid", "name", "exe", "cmdline"]))
+
+    for p in procs:
+        try:
+            p.cpu_percent(None)  # prime; return value is meaningless here
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+
+    time.sleep(CPU_SAMPLE_SECONDS)
+
+    for p in procs:
+        try:
+            info = p.info
+            cpu = p.cpu_percent(None)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
         yield {
             "pid": info.get("pid"),
             "name": info.get("name") or "",
             "exe": info.get("exe") or "",
-            "cpu_percent": info.get("cpu_percent") or 0,
+            "cpu_percent": cpu or 0,
             "cmdline": " ".join(info.get("cmdline") or []),
         }
 
@@ -54,7 +75,10 @@ def scan():
         name = proc["name"].lower()
         exe = proc["exe"]
 
-        if any(sus in name for sus in rules["suspicious_names"]):
+        # Exact match on process name, not substring - "nc" as a substring
+        # check would also match completely unrelated processes like
+        # "systemd-timesyncd" or "*-launcher" (anything containing "nc").
+        if name in rules["suspicious_names"]:
             findings.append({
                 "scanner": "process_scanner",
                 "severity": "high",
