@@ -66,21 +66,21 @@ and presented through a React dashboard with downloadable PDF reports.
 
 ```
 backend/
-  app.py                  Flask API (POST /api/scan, GET /api/scans, ...)
-  scan_service.py          Shared run-scanners-and-persist pipeline (used by app.py and monitor.py)
-  monitor.py               Optional background thread for live/periodic scanning
-  scanners/                One module per check, each exposing scan() -> list[dict]
-  ai/analyzer.py           Aggregates/scores/dedupes findings into a report
-  reports/pdf.py           Renders a report to PDF (falls back to .txt without reportlab)
-  rules/*.json             Signatures used by the process/port scanners
-  rules/yara/*.yar         YARA rules used by yara_scanner
-  utils/                   Hashing + scoring helpers
-  database/                SQLite schema + persistence (scans.db)
-  Dockerfile               Backend image
-frontend/                 React dashboard (create-react-app style)
-  Dockerfile               Multi-stage build -> nginx (used by docker-compose.yml)
-  nginx.conf               Serves the built app, proxies /api/* to the backend container
-docker-compose.yml        Runs backend + frontend together (see "Running with Docker Compose")
+  app.py                    Flask API (POST /api/scan, GET /api/scans, ...)
+  scan_service.py           Shared run-scanners-and-persist pipeline (used by app.py and monitor.py)
+  monitor.py                Optional background thread for live/periodic scanning
+  scanners/                 One module per check, each exposing scan() -> list[dict]
+  ai/analyzer.py            Aggregates/scores/dedupes findings into a report
+  reports/pdf.py            Renders a report to PDF (falls back to .txt without reportlab)
+  rules/*.json              Signatures used by the process/port scanners
+  rules/yara/*.yar          YARA rules used by yara_scanner
+  utils/                    Hashing + scoring helpers
+  database/                 SQLite schema + persistence (scans.db)
+  Dockerfile                Backend image
+frontend/                   React dashboard (create-react-app style)
+  Dockerfile                Multi-stage build -> nginx (used by docker-compose.yml)
+  nginx.conf                Serves the built app, proxies /api/* to the backend container
+docker-compose.yml          Runs backend + frontend together (see "Running with Docker Compose")
 ```
 
 ## Running the backend
