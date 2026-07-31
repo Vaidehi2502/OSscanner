@@ -9,6 +9,8 @@ touched.
 import os
 import stat
 
+import pytest
+
 import scanners.permission_scanner as permission_scanner
 
 
@@ -60,6 +62,16 @@ def test_flags_unknown_suid_binary(tmp_path, monkeypatch):
 
 def test_does_not_flag_known_suid_binary(tmp_path, monkeypatch):
     f = tmp_path / "sudo"
+    f.write_text("x")
+    os.chmod(f, 0o644 | stat.S_ISUID)
+
+    findings = _scan_dir(monkeypatch, tmp_path)
+    assert findings == []
+
+
+@pytest.mark.parametrize("name", ["pppd", "vmware-authd"])
+def test_does_not_flag_whitelisted_suid_binary(tmp_path, monkeypatch, name):
+    f = tmp_path / name
     f.write_text("x")
     os.chmod(f, 0o644 | stat.S_ISUID)
 

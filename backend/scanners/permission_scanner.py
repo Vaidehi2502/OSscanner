@@ -8,6 +8,7 @@ SENSITIVE_DIRS = ["/etc", "/usr/bin", "/usr/sbin", "/bin", "/sbin"]
 KNOWN_SUID_BASENAMES = {
     "sudo", "su", "passwd", "chsh", "chfn", "gpasswd", "newgrp",
     "mount", "umount", "ping", "ping6", "pkexec", "fusermount", "fusermount3",
+    "pppd", "vmware-authd",
 }
 
 # Binaries that legitimately carry the SGID bit on most distros (shadow/crontab
