@@ -81,7 +81,11 @@ def get_scan(scan_id):
     conn = get_connection()
     try:
         row = conn.execute("SELECT report_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
-        return json.loads(row["report_json"]) if row else None
+        if row is None:
+            return None
+        report = json.loads(row["report_json"])
+        report["scan_id"] = scan_id
+        return report
     finally:
         conn.close()
 

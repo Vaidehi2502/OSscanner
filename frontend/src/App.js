@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { runScan, downloadPdf, listScans } from "./api";
+import { runScan, downloadPdf, listScans, getScan } from "./api";
+import { formatTimestamp } from "./format";
 import RiskGauge from "./components/RiskGauge";
 import FindingsTable from "./components/FindingsTable";
 import ScanHistory from "./components/ScanHistory";
@@ -7,6 +8,7 @@ import ScanHistory from "./components/ScanHistory";
 export default function App() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [viewingScanId, setViewingScanId] = useState(null);
   const [error, setError] = useState(null);
   const [scans, setScans] = useState([]);
 
@@ -28,11 +30,23 @@ export default function App() {
     try {
       const result = await runScan();
       setReport(result);
+      setViewingScanId(result.scan_id ?? null);
       await refreshHistory();
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSelectScan(scanId) {
+    setError(null);
+    setViewingScanId(scanId);
+    try {
+      setReport(await getScan(scanId));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -60,6 +74,15 @@ export default function App() {
       {error && (
         <div className="alert alert-error">
           <span>Error: {error}</span>
+        </div>
+      )}
+
+      {report && scans.length > 0 && viewingScanId !== scans[0].id && (
+        <div className="alert alert-info">
+          <span>Viewing a past scan{report.generated_at ? ` from ${formatTimestamp(report.generated_at)}` : ""}.</span>
+          <button className="btn-link" onClick={() => handleSelectScan(scans[0].id)}>
+            View latest
+          </button>
         </div>
       )}
 
@@ -94,7 +117,7 @@ export default function App() {
 
       <div className="card-section card">
         <div className="section-title">Scan history</div>
-        <ScanHistory scans={scans} />
+        <ScanHistory scans={scans} selectedId={viewingScanId} onSelect={handleSelectScan} />
       </div>
     </div>
   );

@@ -75,3 +75,32 @@ def test_health_accessible_without_api_key_even_when_configured(client, monkeypa
     monkeypatch.setenv("API_KEY", "test-secret-key")
     resp = client.get("/api/health")
     assert resp.status_code == 200
+
+
+def test_run_scan_response_includes_scan_id_and_summary(client, monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "run_all",
+        lambda: [{"scanner": "x", "severity": "high", "title": "t", "description": "d"}],
+    )
+    resp = client.post("/api/scan")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert isinstance(body["scan_id"], int)
+    assert body["summary"]
+
+
+def test_get_scan_returns_the_same_scan_id_and_summary_as_the_original_run(client, monkeypatch):
+    # Regression test: report_json is persisted before scan_id is known and
+    # before summarize() ran, so a naive get_scan() would silently drop both
+    # fields for every historical scan fetched after the fact.
+    monkeypatch.setattr(
+        app_module,
+        "run_all",
+        lambda: [{"scanner": "x", "severity": "high", "title": "t", "description": "d"}],
+    )
+    posted = client.post("/api/scan").get_json()
+
+    fetched = client.get(f"/api/scans/{posted['scan_id']}").get_json()
+    assert fetched["scan_id"] == posted["scan_id"]
+    assert fetched["summary"] == posted["summary"]

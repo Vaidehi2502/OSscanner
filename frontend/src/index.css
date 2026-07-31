@@ -169,6 +169,13 @@ code {
   color: #fca5a5;
 }
 
+.alert-info {
+  background: rgba(76, 95, 216, 0.14);
+  border: 1px solid rgba(76, 95, 216, 0.35);
+  color: #a9b4f0;
+  justify-content: space-between;
+}
+
 /* Empty state */
 
 .empty-state {
@@ -304,6 +311,16 @@ code {
 
 .data-table tbody tr:hover {
   background: var(--surface-hover);
+}
+
+.data-table tbody tr.row-selected {
+  background: rgba(76, 95, 216, 0.12);
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.data-table tbody tr[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .text-dim {

@@ -138,6 +138,63 @@ test("clicking download report calls downloadPdf with the scan id", async () => 
   expect(api.downloadPdf).toHaveBeenCalledWith(9);
 });
 
+test("clicking a past scan in history loads and displays that scan's report", async () => {
+  api.listScans.mockResolvedValue([
+    { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 1 },
+    { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 90, risk_level: "critical", total_findings: 1 },
+  ]);
+  api.getScan.mockResolvedValue({
+    scan_id: 1,
+    generated_at: "2026-07-30T09:00:00Z",
+    risk_score: 90,
+    risk_level: "critical",
+    total_findings: 1,
+    summary: "Risk level: CRITICAL (score 90/100). 1 findings across 1 scanners.",
+    findings: [{ severity: "critical", scanner: "port_scanner", title: "Old finding", description: "d" }],
+  });
+
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("90"); // history table loaded
+
+  await clickAndFlush(user, screen.getByRole("row", { name: /View scan from Jul 30/ }));
+
+  expect(api.getScan).toHaveBeenCalledWith(1);
+  expect(screen.getByText("Old finding")).toBeInTheDocument();
+  expect(screen.getByText(/Viewing a past scan/)).toBeInTheDocument();
+});
+
+test("clicking View latest returns to the most recent scan", async () => {
+  api.listScans.mockResolvedValue([
+    { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 1 },
+    { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 90, risk_level: "critical", total_findings: 1 },
+  ]);
+  api.getScan.mockImplementation((id) =>
+    Promise.resolve({
+      scan_id: id,
+      generated_at: "2026-07-30T09:00:00Z",
+      risk_score: id === 1 ? 90 : 18,
+      risk_level: id === 1 ? "critical" : "low",
+      total_findings: 1,
+      summary: "s",
+      findings: [{ severity: "low", scanner: "x", title: `Finding for scan ${id}`, description: "d" }],
+    })
+  );
+
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("90");
+
+  await clickAndFlush(user, screen.getByRole("row", { name: /View scan from Jul 30/ }));
+  expect(screen.getByText("Finding for scan 1")).toBeInTheDocument();
+
+  await clickAndFlush(user, screen.getByRole("button", { name: "View latest" }));
+
+  expect(api.getScan).toHaveBeenLastCalledWith(2);
+  expect(screen.getByText("Finding for scan 2")).toBeInTheDocument();
+  expect(screen.queryByText(/Viewing a past scan/)).not.toBeInTheDocument();
+});
+
 test("shows an error message when the PDF download fails", async () => {
   api.runScan.mockResolvedValue({
     scan_id: 9,

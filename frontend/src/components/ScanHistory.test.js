@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import ScanHistory from "./ScanHistory";
 
 test("renders placeholder text when there are no past scans", () => {
@@ -25,4 +26,29 @@ test("renders a table row per scan with its details", () => {
   expect(screen.getByText("critical")).toBeInTheDocument();
   // header row + one row per scan
   expect(screen.getAllByRole("row")).toHaveLength(scans.length + 1);
+});
+
+test("clicking a row calls onSelect with that scan's id", async () => {
+  const scans = [
+    { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 1 },
+  ];
+  const onSelect = jest.fn();
+  const user = userEvent.setup();
+
+  render(<ScanHistory scans={scans} onSelect={onSelect} />);
+  await user.click(screen.getByRole("row", { name: /View scan from/ }));
+
+  expect(onSelect).toHaveBeenCalledWith(2);
+});
+
+test("highlights the selected row", () => {
+  const scans = [
+    { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 1 },
+    { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 90, risk_level: "critical", total_findings: 1 },
+  ];
+
+  render(<ScanHistory scans={scans} selectedId={1} />);
+
+  expect(screen.getByRole("row", { name: /View scan from Jul 30/ })).toHaveClass("row-selected");
+  expect(screen.getByRole("row", { name: /View scan from Jul 31/ })).not.toHaveClass("row-selected");
 });

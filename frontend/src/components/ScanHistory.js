@@ -8,17 +8,9 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { formatTimestamp } from "../format";
 
-function formatTimestamp(iso) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
-        " " +
-        d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
-export default function ScanHistory({ scans }) {
+export default function ScanHistory({ scans, selectedId, onSelect }) {
   if (!scans || scans.length === 0) {
     return <p className="text-dim">No past scans yet.</p>;
   }
@@ -64,7 +56,20 @@ export default function ScanHistory({ scans }) {
         </thead>
         <tbody>
           {scans.map((s) => (
-            <tr key={s.id}>
+            <tr
+              key={s.id}
+              tabIndex={onSelect ? 0 : undefined}
+              aria-label={`View scan from ${formatTimestamp(s.started_at)}`}
+              className={s.id === selectedId ? "row-selected" : ""}
+              style={onSelect ? { cursor: "pointer" } : undefined}
+              onClick={() => onSelect && onSelect(s.id)}
+              onKeyDown={(e) => {
+                if (onSelect && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onSelect(s.id);
+                }
+              }}
+            >
               <td className="text-dim">{formatTimestamp(s.started_at)}</td>
               <td>{s.risk_score}</td>
               <td>

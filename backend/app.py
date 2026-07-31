@@ -70,9 +70,8 @@ def _ensure_db():
 def run_scan():
     findings = run_all()
     report = analyze(findings)
-    scan_id = db.save_report(report)
-    report["scan_id"] = scan_id
     report["summary"] = summarize(report)
+    report["scan_id"] = db.save_report(report)
     return jsonify(report)
 
 
