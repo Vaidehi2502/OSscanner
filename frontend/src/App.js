@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { runScan, downloadPdf, listScans, getScan } from "./api";
+import { runScan, downloadPdf, listScans, getScan, getMonitorStatus } from "./api";
 import { formatTimestamp } from "./format";
 import RiskGauge from "./components/RiskGauge";
 import FindingsTable from "./components/FindingsTable";
 import ScanHistory from "./components/ScanHistory";
+
+const LIVE_POLL_INTERVAL_MS = 10000;
 
 export default function App() {
   const [report, setReport] = useState(null);
@@ -11,6 +13,8 @@ export default function App() {
   const [viewingScanId, setViewingScanId] = useState(null);
   const [error, setError] = useState(null);
   const [scans, setScans] = useState([]);
+  const [monitorStatus, setMonitorStatus] = useState(null);
+  const [liveEnabled, setLiveEnabled] = useState(true);
 
   async function refreshHistory() {
     try {
@@ -22,7 +26,38 @@ export default function App() {
 
   useEffect(() => {
     refreshHistory();
+    getMonitorStatus()
+      .then(setMonitorStatus)
+      .catch(() => {
+        // Background-monitor status is informational only; ignore failures.
+      });
   }, []);
+
+  // Polls for scans completed by any source (the background monitor, or a
+  // scan run from another tab/user) and follows the latest one - but only
+  // when the viewer isn't deliberately looking at an older scan already.
+  useEffect(() => {
+    if (!liveEnabled) return undefined;
+
+    const wasViewingLatest = viewingScanId === null || viewingScanId === scans[0]?.id;
+
+    const id = setInterval(async () => {
+      try {
+        const latest = await listScans();
+        setScans(latest);
+
+        const newestId = latest[0]?.id;
+        if (wasViewingLatest && newestId !== undefined && newestId !== viewingScanId) {
+          setReport(await getScan(newestId));
+          setViewingScanId(newestId);
+        }
+      } catch {
+        // Transient poll failure - just try again next tick.
+      }
+    }, LIVE_POLL_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  }, [liveEnabled, scans, viewingScanId]);
 
   async function handleScan() {
     setLoading(true);
@@ -63,12 +98,25 @@ export default function App() {
       <header className="page-header">
         <div>
           <h1 className="page-title">SentinelOS</h1>
-          <p className="page-subtitle">OS security scanner &mdash; processes, ports, users, and more.</p>
+          <p className="page-subtitle">
+            OS security scanner &mdash; processes, ports, users, and more.
+            {monitorStatus?.enabled && ` Background scanning every ${monitorStatus.interval_seconds}s.`}
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={handleScan} disabled={loading}>
-          {loading && <span className="spinner" />}
-          {loading ? "Scanning..." : "Run Scan"}
-        </button>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button
+            className={`tab ${liveEnabled ? "active" : ""}`}
+            onClick={() => setLiveEnabled((v) => !v)}
+            title={liveEnabled ? "Pause auto-refresh" : "Resume auto-refresh"}
+          >
+            <span className={`live-dot ${liveEnabled ? "" : "live-dot-off"}`} />
+            Live
+          </button>
+          <button className="btn btn-primary" onClick={handleScan} disabled={loading}>
+            {loading && <span className="spinner" />}
+            {loading ? "Scanning..." : "Run Scan"}
+          </button>
+        </div>
       </header>
 
       {error && (

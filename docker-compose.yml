@@ -1,0 +1,35 @@
+# Runs the backend and frontend together for local use.
+#
+# By default each container only sees its OWN isolated processes, network
+# state, and filesystem - not your actual machine. That's fine for
+# exercising the API/UI, but it is not a real scan of your host. See the
+# "Running the backend in Docker" section in README.md for the
+# --pid=host/--network=host/bind-mount flags needed for real host
+# visibility (and their limitations) if you want that - deliberately not
+# defaulted here, since it's a meaningfully larger privilege footprint
+# (host PID/network namespaces, read access to /etc/shadow) than a bare
+# `docker compose up` should silently opt you into.
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      API_KEY: ${API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      MONITOR_INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-}
+    volumes:
+      - scans-db:/app/database
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_KEY: ${API_KEY:-}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  scans-db:

@@ -14,6 +14,7 @@ from . import (
     log_scanner,
     user_scanner,
     port_scanner,
+    yara_scanner,
 )
 
 SCANNERS = {
@@ -25,6 +26,7 @@ SCANNERS = {
     "log": log_scanner,
     "user": user_scanner,
     "port": port_scanner,
+    "yara": yara_scanner,
 }
 
 

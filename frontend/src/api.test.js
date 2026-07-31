@@ -53,6 +53,16 @@ test("listScans and getScan hit the expected paths", async () => {
   expect(global.fetch).toHaveBeenCalledWith("/api/scans/5", expect.anything());
 });
 
+test("getMonitorStatus hits the expected path", async () => {
+  const { getMonitorStatus } = loadApiWithKey(undefined);
+  mockFetchOnce({ enabled: false, interval_seconds: 0 });
+
+  const result = await getMonitorStatus();
+
+  expect(global.fetch).toHaveBeenCalledWith("/api/monitor", expect.anything());
+  expect(result).toEqual({ enabled: false, interval_seconds: 0 });
+});
+
 test("throws with the status code when the response is not ok", async () => {
   const { getScan } = loadApiWithKey(undefined);
   mockFetchOnce({}, { ok: false, status: 404 });

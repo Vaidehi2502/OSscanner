@@ -77,9 +77,24 @@ def test_health_accessible_without_api_key_even_when_configured(client, monkeypa
     assert resp.status_code == 200
 
 
+def test_monitor_status_disabled_by_default(client):
+    # monitor.start() is only ever called from app.py's __main__ block, so
+    # importing/testing the app module never actually starts the thread.
+    resp = client.get("/api/monitor")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"enabled": False, "interval_seconds": 0}
+
+
+def test_monitor_status_requires_api_key_when_configured(client, monkeypatch):
+    # /api/monitor is under /api/* like everything except /api/health.
+    monkeypatch.setenv("API_KEY", "test-secret-key")
+    resp = client.get("/api/monitor")
+    assert resp.status_code == 401
+
+
 def test_run_scan_response_includes_scan_id_and_summary(client, monkeypatch):
     monkeypatch.setattr(
-        app_module,
+        app_module.scan_service,
         "run_all",
         lambda: [{"scanner": "x", "severity": "high", "title": "t", "description": "d"}],
     )
@@ -95,7 +110,7 @@ def test_get_scan_returns_the_same_scan_id_and_summary_as_the_original_run(clien
     # before summarize() ran, so a naive get_scan() would silently drop both
     # fields for every historical scan fetched after the fact.
     monkeypatch.setattr(
-        app_module,
+        app_module.scan_service,
         "run_all",
         lambda: [{"scanner": "x", "severity": "high", "title": "t", "description": "d"}],
     )

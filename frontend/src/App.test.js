@@ -8,6 +8,7 @@ jest.mock("./api");
 
 beforeEach(() => {
   api.listScans.mockResolvedValue([]);
+  api.getMonitorStatus.mockResolvedValue({ enabled: false, interval_seconds: 0 });
 });
 
 afterEach(() => {
@@ -212,4 +213,124 @@ test("shows an error message when the PDF download fails", async () => {
   await clickAndFlush(user, screen.getByRole("button", { name: "Download report" }));
 
   expect(screen.getByText(/Error: Request to \/scans\/9\/pdf failed with status 401/)).toBeInTheDocument();
+});
+
+test("shows the background scanning interval in the subtitle when the monitor is enabled", async () => {
+  api.getMonitorStatus.mockResolvedValue({ enabled: true, interval_seconds: 300 });
+
+  render(<App />);
+
+  expect(await screen.findByText(/Background scanning every 300s/)).toBeInTheDocument();
+});
+
+describe("live polling", () => {
+  // Flush the pending microtasks from the interval callback's chained
+  // awaits (listScans -> possibly getScan -> setState) after advancing the
+  // fake timer - jest's fake timers only fake the clock, not the
+  // microtask queue, so real awaits still need real "ticks" to resolve.
+  async function advanceLivePoll() {
+    await act(async () => {
+      jest.advanceTimersByTime(10000);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("automatically loads a newly completed scan while viewing the latest", async () => {
+    api.listScans.mockResolvedValue([
+      { id: 1, started_at: "2026-07-31T09:00:00Z", risk_score: 10, risk_level: "low", total_findings: 1 },
+    ]);
+
+    render(<App />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    api.listScans.mockResolvedValue([
+      { id: 2, started_at: "2026-07-31T09:10:00Z", risk_score: 40, risk_level: "medium", total_findings: 3 },
+      { id: 1, started_at: "2026-07-31T09:00:00Z", risk_score: 10, risk_level: "low", total_findings: 1 },
+    ]);
+    api.getScan.mockResolvedValue({
+      scan_id: 2,
+      generated_at: "2026-07-31T09:10:00Z",
+      risk_score: 40,
+      risk_level: "medium",
+      total_findings: 3,
+      summary: "s",
+      findings: [{ severity: "medium", scanner: "x", title: "New live finding", description: "d" }],
+    });
+
+    await advanceLivePoll();
+
+    expect(api.getScan).toHaveBeenCalledWith(2);
+    expect(screen.getByText("New live finding")).toBeInTheDocument();
+  });
+
+  test("does not disturb the view when looking at a past scan", async () => {
+    api.listScans.mockResolvedValue([
+      { id: 2, started_at: "2026-07-31T09:10:00Z", risk_score: 40, risk_level: "medium", total_findings: 3 },
+      { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 10, risk_level: "low", total_findings: 1 },
+    ]);
+    api.getScan.mockResolvedValue({
+      scan_id: 1,
+      generated_at: "2026-07-30T09:00:00Z",
+      risk_score: 10,
+      risk_level: "low",
+      total_findings: 1,
+      summary: "s",
+      findings: [{ severity: "low", scanner: "x", title: "Old finding", description: "d" }],
+    });
+
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await user.click(screen.getByRole("row", { name: /View scan from Jul 30/ }));
+    });
+    expect(screen.getByText("Old finding")).toBeInTheDocument();
+
+    api.listScans.mockResolvedValue([
+      { id: 3, started_at: "2026-07-31T09:20:00Z", risk_score: 80, risk_level: "high", total_findings: 5 },
+      { id: 2, started_at: "2026-07-31T09:10:00Z", risk_score: 40, risk_level: "medium", total_findings: 3 },
+      { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 10, risk_level: "low", total_findings: 1 },
+    ]);
+
+    await advanceLivePoll();
+
+    expect(screen.getByText("Old finding")).toBeInTheDocument();
+    expect(api.getScan).not.toHaveBeenCalledWith(3);
+  });
+
+  test("toggling Live off stops polling", async () => {
+    api.listScans.mockResolvedValue([
+      { id: 1, started_at: "2026-07-31T09:00:00Z", risk_score: 10, risk_level: "low", total_findings: 1 },
+    ]);
+
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await user.click(screen.getByRole("button", { name: /Live/ }));
+    });
+
+    const callsBeforeAdvance = api.listScans.mock.calls.length;
+    await advanceLivePoll();
+
+    expect(api.listScans.mock.calls.length).toBe(callsBeforeAdvance);
+  });
 });

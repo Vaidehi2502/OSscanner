@@ -28,6 +28,10 @@ export function getScan(scanId) {
   return request(`/scans/${scanId}`);
 }
 
+export function getMonitorStatus() {
+  return request("/monitor");
+}
+
 // A plain <a href> can't carry the X-API-Key header, so the PDF is fetched
 // here (with the header) and handed to the browser as a Blob download
 // instead of linking directly to the API URL.

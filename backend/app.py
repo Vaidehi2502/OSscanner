@@ -5,16 +5,17 @@ Endpoints:
     GET  /api/scans            - list past scan summaries
     GET  /api/scans/<id>       - fetch a full stored report
     GET  /api/scans/<id>/pdf   - download the report as a PDF
+    GET  /api/monitor          - background monitor status
 """
 import hmac
 import os
 
 from flask import Flask, jsonify, request, send_file
 
-from scanners import run_all
-from ai.analyzer import analyze, summarize
 from reports.pdf import generate_pdf_report
 from database import db
+import monitor
+import scan_service
 
 app = Flask(__name__)
 
@@ -68,11 +69,7 @@ def _ensure_db():
 
 @app.route("/api/scan", methods=["POST"])
 def run_scan():
-    findings = run_all()
-    report = analyze(findings)
-    report["summary"] = summarize(report)
-    report["scan_id"] = db.save_report(report)
-    return jsonify(report)
+    return jsonify(scan_service.run_and_persist_scan())
 
 
 @app.route("/api/scans", methods=["GET"])
@@ -99,6 +96,11 @@ def get_scan_pdf(scan_id):
     return send_file(actual_path, as_attachment=True)
 
 
+@app.route("/api/monitor", methods=["GET"])
+def monitor_status():
+    return jsonify(monitor.status())
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
@@ -106,6 +108,7 @@ def health():
 
 if __name__ == "__main__":
     db.init_db()
+    monitor.start()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     host = os.environ.get("FLASK_HOST", "127.0.0.1")
     port = int(os.environ.get("FLASK_PORT", "5000"))
