@@ -6,6 +6,10 @@ import * as api from "./api";
 
 jest.mock("./api");
 
+beforeEach(() => {
+  api.listScans.mockResolvedValue([]);
+});
+
 afterEach(() => {
   jest.clearAllMocks();
 });
@@ -22,10 +26,48 @@ async function clickAndFlush(user, element) {
   });
 }
 
-test("shows the initial prompt before any scan has run", () => {
+test("shows the initial prompt before any scan has run", async () => {
   render(<App />);
   expect(screen.getByText(/Click "Run Scan"/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Download report" })).not.toBeInTheDocument();
+  // Flush the mount-time listScans() fetch so its setState doesn't leak into the next test.
+  await act(async () => {});
+});
+
+test("loads and displays past scans on mount", async () => {
+  api.listScans.mockResolvedValue([
+    { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 12 },
+    { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 90, risk_level: "critical", total_findings: 126 },
+  ]);
+
+  render(<App />);
+
+  expect(await screen.findByText("18")).toBeInTheDocument();
+  expect(screen.getByText("90")).toBeInTheDocument();
+});
+
+test("refreshes scan history after running a new scan", async () => {
+  api.listScans.mockResolvedValueOnce([]);
+  api.runScan.mockResolvedValue({
+    scan_id: 9,
+    risk_score: 10,
+    risk_level: "low",
+    total_findings: 0,
+    summary: "clean",
+    findings: [],
+  });
+
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("No past scans yet.");
+
+  api.listScans.mockResolvedValueOnce([
+    { id: 9, started_at: "2026-07-31T09:00:00Z", risk_score: 10, risk_level: "low", total_findings: 0 },
+  ]);
+  await clickAndFlush(user, screen.getByRole("button", { name: "Run Scan" }));
+
+  expect(api.listScans).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole("cell", { name: "10" })).toBeInTheDocument();
 });
 
 test("running a scan displays the report and findings", async () => {
