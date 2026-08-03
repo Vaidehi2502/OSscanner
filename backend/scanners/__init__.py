@@ -30,10 +30,11 @@ SCANNERS = {
 }
 
 
-def run_all():
-    """Run every registered scanner and return a flat list of findings."""
+def run_selected(names):
+    """Run the named registered scanners and return a flat list of findings."""
     findings = []
-    for name, module in SCANNERS.items():
+    for name in names:
+        module = SCANNERS[name]
         try:
             findings.extend(module.scan())
         except Exception as exc:
@@ -45,3 +46,8 @@ def run_all():
                 "evidence": {},
             })
     return findings
+
+
+def run_all():
+    """Run every registered scanner and return a flat list of findings."""
+    return run_selected(SCANNERS.keys())

@@ -218,6 +218,11 @@ code {
   background: var(--critical-bg);
 }
 
+.pill-type {
+  color: var(--primary);
+  background: rgba(76, 95, 216, 0.14);
+}
+
 /* Filter tabs */
 
 .tabs {

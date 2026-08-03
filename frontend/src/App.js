@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { runScan, downloadPdf, listScans, getScan, getMonitorStatus } from "./api";
+import { runScan, runAvScan, downloadPdf, listScans, getScan, getMonitorStatus } from "./api";
 import { formatTimestamp } from "./format";
 import RiskGauge from "./components/RiskGauge";
 import FindingsTable from "./components/FindingsTable";
@@ -10,6 +10,7 @@ const LIVE_POLL_INTERVAL_MS = 10000;
 export default function App() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [avLoading, setAvLoading] = useState(false);
   const [viewingScanId, setViewingScanId] = useState(null);
   const [error, setError] = useState(null);
   const [scans, setScans] = useState([]);
@@ -74,6 +75,21 @@ export default function App() {
     }
   }
 
+  async function handleAvScan() {
+    setAvLoading(true);
+    setError(null);
+    try {
+      const result = await runAvScan();
+      setReport(result);
+      setViewingScanId(result.scan_id ?? null);
+      await refreshHistory();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAvLoading(false);
+    }
+  }
+
   async function handleSelectScan(scanId) {
     setError(null);
     setViewingScanId(scanId);
@@ -99,7 +115,8 @@ export default function App() {
         <div>
           <h1 className="page-title">SentinelOS</h1>
           <p className="page-subtitle">
-            OS security scanner &mdash; processes, ports, users, and more.
+            OS security scanner with a dedicated antivirus scan &mdash; malware
+            detection plus processes, ports, users, and more.
             {monitorStatus?.enabled && ` Background scanning every ${monitorStatus.interval_seconds}s.`}
           </p>
         </div>
@@ -112,7 +129,11 @@ export default function App() {
             <span className={`live-dot ${liveEnabled ? "" : "live-dot-off"}`} />
             Live
           </button>
-          <button className="btn btn-primary" onClick={handleScan} disabled={loading}>
+          <button className="btn" onClick={handleAvScan} disabled={loading || avLoading}>
+            {avLoading && <span className="spinner" />}
+            {avLoading ? "Scanning..." : "Run Antivirus Scan"}
+          </button>
+          <button className="btn btn-primary" onClick={handleScan} disabled={loading || avLoading}>
             {loading && <span className="spinner" />}
             {loading ? "Scanning..." : "Run Scan"}
           </button>
@@ -156,10 +177,10 @@ export default function App() {
         </div>
       )}
 
-      {!report && !loading && (
+      {!report && !loading && !avLoading && (
         <div className="card empty-state">
-          Click "Run Scan" to check this machine for suspicious processes, ports,
-          startup items, and more.
+          Click "Run Antivirus Scan" to check for malware, or "Run Scan" for a
+          full check of processes, ports, startup items, and more.
         </div>
       )}
 

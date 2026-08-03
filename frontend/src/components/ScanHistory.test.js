@@ -28,6 +28,18 @@ test("renders a table row per scan with its details", () => {
   expect(screen.getAllByRole("row")).toHaveLength(scans.length + 1);
 });
 
+test("shows an Antivirus badge for av scans and a Full badge otherwise", () => {
+  const scans = [
+    { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 1, scan_type: "av" },
+    { id: 1, started_at: "2026-07-30T09:00:00Z", risk_score: 90, risk_level: "critical", total_findings: 1, scan_type: "full" },
+  ];
+
+  render(<ScanHistory scans={scans} />);
+
+  expect(screen.getByText("Antivirus")).toBeInTheDocument();
+  expect(screen.getByText("Full")).toBeInTheDocument();
+});
+
 test("clicking a row calls onSelect with that scan's id", async () => {
   const scans = [
     { id: 2, started_at: "2026-07-31T09:00:00Z", risk_score: 18, risk_level: "low", total_findings: 1 },

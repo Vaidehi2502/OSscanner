@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS scans (
     risk_score INTEGER,
     risk_level TEXT,
     total_findings INTEGER,
-    report_json TEXT
+    report_json TEXT,
+    scan_type TEXT NOT NULL DEFAULT 'full'
 );
 
 CREATE TABLE IF NOT EXISTS findings (

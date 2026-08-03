@@ -10,6 +10,25 @@ and presented through a React dashboard with downloadable PDF reports.
 
 ## Features
 
+- A dedicated **antivirus scan** (`POST /api/scan/av`, "Run Antivirus Scan"
+  in the dashboard) that runs just the malware-detection scanners
+  (dropped-executable heuristics + YARA) against dropper-prone directories
+  (`/tmp`, `/var/tmp`, `/dev/shm`) - fast to run on demand, separate from
+  the full OS-hygiene scan, and recorded in scan history with its own
+  "Antivirus" badge.
+- A broad, curated YARA ruleset (`backend/rules/yara/`, 28 rules across 9
+  files) covering webshells (PHP/JSP/ASPX command exec, obfuscated eval,
+  known kit signatures), cryptominers (XMRig, Stratum pool URIs,
+  CryptoNight/RandomX), ransomware (ransom notes, shadow-copy deletion,
+  mass file renaming), credential dumping (Mimikatz, `/etc/shadow`
+  exfiltration, SSH key harvesting, browser credential stores),
+  persistence/backdoors (SSH `authorized_keys`, cron, shell-profile, rogue
+  systemd units), packers/obfuscation (UPX, obfuscated PowerShell/Python,
+  raw shellcode blobs), C2/beacon indicators (Cobalt Strike, Meterpreter,
+  spoofed user agents, raw reverse-shell socket code), and generic Linux
+  malware (Mirai/botnet strings, ELF backdoors, LKM rootkit markers) - on
+  top of the original EICAR test rule and reverse-shell/base64-dropper
+  patterns.
 - Eight scanners covering processes, network connections, listening ports,
   startup persistence (cron/systemd/autostart), auth logs, file
   permissions (SUID/SGID/world-writable), user accounts, and YARA rule
@@ -57,10 +76,15 @@ and presented through a React dashboard with downloadable PDF reports.
   only sees the container's own binaries, not the host's; systemd-based
   checks don't work without a running systemd instance) - see "Running the
   backend in Docker" below for details.
-- The shipped YARA rule set (`backend/rules/yara/`) is a small starter set
-  (an EICAR test-string rule and two generic dropper/reverse-shell
-  patterns), not real-world malware coverage - drop in rules from a source
-  like YARA-Forge or your own for meaningful detection.
+- The shipped YARA rule set (`backend/rules/yara/`) is a curated,
+  self-authored set of generic pattern rules (webshells, cryptominers,
+  ransomware, credential dumping, persistence, packers, C2 beacons, Linux
+  malware) - useful for catching common techniques, but it's not the scale
+  or up-to-date signature coverage of a real-world feed. Drop in rules from
+  a source like YARA-Forge for more thorough detection.
+- The antivirus scan (`POST /api/scan/av`) only inspects `/tmp`, `/var/tmp`,
+  and `/dev/shm` (the same dropper-prone locations as the full scan's file
+  scanner) - it is not a full-filesystem or on-access/real-time scanner.
 
 ## Project layout
 
@@ -295,6 +319,7 @@ REACT_APP_API_KEY=some-long-random-secret
 | Method | Path                    | Description                          |
 |--------|-------------------------|--------------------------------------|
 | POST   | `/api/scan`             | Run all scanners, persist, return report |
+| POST   | `/api/scan/av`          | Run only the antivirus scanners (file + YARA), persist, return report |
 | GET    | `/api/scans`            | List past scan summaries             |
 | GET    | `/api/scans/<id>`       | Fetch a full stored report           |
 | GET    | `/api/scans/<id>/pdf`   | Download the report (PDF or .txt fallback) |

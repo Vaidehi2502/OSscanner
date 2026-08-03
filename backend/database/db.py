@@ -22,17 +22,39 @@ def init_db():
     try:
         conn.executescript(schema)
         conn.commit()
+        _migrate(conn)
     finally:
         conn.close()
 
 
-def save_report(report):
+def migrate():
+    """Patch an already-existing database file up to the current schema.
+
+    init_db()'s CREATE TABLE IF NOT EXISTS never touches a table that
+    already exists, so a scans.db created before a column was added (e.g.
+    scan_type) needs this run separately against it.
+    """
+    conn = get_connection()
+    try:
+        _migrate(conn)
+    finally:
+        conn.close()
+
+
+def _migrate(conn):
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(scans)").fetchall()}
+    if "scan_type" not in columns:
+        conn.execute("ALTER TABLE scans ADD COLUMN scan_type TEXT NOT NULL DEFAULT 'full'")
+        conn.commit()
+
+
+def save_report(report, scan_type="full"):
     """Persist an analyzer report and its findings. Returns the new scan id."""
     conn = get_connection()
     try:
         cur = conn.execute(
-            """INSERT INTO scans (started_at, finished_at, risk_score, risk_level, total_findings, report_json)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO scans (started_at, finished_at, risk_score, risk_level, total_findings, report_json, scan_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
                 report["generated_at"],
                 datetime.now(timezone.utc).isoformat(),
@@ -40,6 +62,7 @@ def save_report(report):
                 report["risk_level"],
                 report["total_findings"],
                 json.dumps(report),
+                scan_type,
             ),
         )
         scan_id = cur.lastrowid
@@ -68,7 +91,7 @@ def list_scans(limit=20):
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT id, started_at, finished_at, risk_score, risk_level, total_findings "
+            "SELECT id, started_at, finished_at, risk_score, risk_level, total_findings, scan_type "
             "FROM scans ORDER BY id DESC LIMIT ?",
             (limit,),
         ).fetchall()

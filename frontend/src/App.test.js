@@ -29,10 +29,31 @@ async function clickAndFlush(user, element) {
 
 test("shows the initial prompt before any scan has run", async () => {
   render(<App />);
-  expect(screen.getByText(/Click "Run Scan"/)).toBeInTheDocument();
+  expect(screen.getByText(/Click "Run Antivirus Scan"/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Download report" })).not.toBeInTheDocument();
   // Flush the mount-time listScans() fetch so its setState doesn't leak into the next test.
   await act(async () => {});
+});
+
+test("running an antivirus scan displays the report and findings", async () => {
+  api.runAvScan.mockResolvedValue({
+    scan_id: 11,
+    scan_type: "av",
+    risk_score: 30,
+    risk_level: "medium",
+    total_findings: 1,
+    summary: "Risk level: MEDIUM (score 30/100). 1 findings across 1 scanners.",
+    findings: [
+      { severity: "high", scanner: "yara_scanner", title: "YARA match: PHP_Webshell_Command_Exec", description: "d" },
+    ],
+  });
+
+  const user = userEvent.setup();
+  render(<App />);
+  await clickAndFlush(user, screen.getByRole("button", { name: "Run Antivirus Scan" }));
+
+  expect(screen.getByText("YARA match: PHP_Webshell_Command_Exec")).toBeInTheDocument();
+  expect(api.runAvScan).toHaveBeenCalledTimes(1);
 });
 
 test("loads and displays past scans on mount", async () => {

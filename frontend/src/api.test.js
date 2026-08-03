@@ -41,6 +41,16 @@ test("runScan posts to /api/scan and returns the parsed JSON", async () => {
   expect(result).toEqual({ risk_score: 42 });
 });
 
+test("runAvScan posts to /api/scan/av and returns the parsed JSON", async () => {
+  const { runAvScan } = loadApiWithKey(undefined);
+  mockFetchOnce({ scan_type: "av", risk_score: 12 });
+
+  const result = await runAvScan();
+
+  expect(global.fetch).toHaveBeenCalledWith("/api/scan/av", expect.objectContaining({ method: "POST" }));
+  expect(result).toEqual({ scan_type: "av", risk_score: 12 });
+});
+
 test("listScans and getScan hit the expected paths", async () => {
   const { listScans, getScan } = loadApiWithKey(undefined);
 

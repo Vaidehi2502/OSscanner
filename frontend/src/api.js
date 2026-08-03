@@ -20,6 +20,10 @@ export function runScan() {
   return request("/scan", { method: "POST" });
 }
 
+export function runAvScan() {
+  return request("/scan/av", { method: "POST" });
+}
+
 export function listScans() {
   return request("/scans");
 }

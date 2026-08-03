@@ -49,6 +49,7 @@ export default function ScanHistory({ scans, selectedId, onSelect }) {
         <thead>
           <tr>
             <th>Date</th>
+            <th>Type</th>
             <th>Score</th>
             <th>Level</th>
             <th>Findings</th>
@@ -71,6 +72,9 @@ export default function ScanHistory({ scans, selectedId, onSelect }) {
               }}
             >
               <td className="text-dim">{formatTimestamp(s.started_at)}</td>
+              <td>
+                <span className="pill pill-type">{s.scan_type === "av" ? "Antivirus" : "Full"}</span>
+              </td>
               <td>{s.risk_score}</td>
               <td>
                 <span className={`pill pill-${s.risk_level}`}>{s.risk_level}</span>

@@ -40,6 +40,33 @@ def test_flags_reverse_shell_pattern(tmp_path, monkeypatch):
     assert findings[0]["severity"] == "high"
 
 
+def test_flags_php_webshell(tmp_path, monkeypatch):
+    f = tmp_path / "upload.php"
+    f.write_text('<?php system($_POST["cmd"]); ?>')
+
+    findings = _scan_dir(monkeypatch, tmp_path)
+    titles = [f["title"] for f in findings]
+    assert "YARA match: PHP_Webshell_Command_Exec" in titles
+
+
+def test_flags_ransom_note(tmp_path, monkeypatch):
+    f = tmp_path / "READ_ME.txt"
+    f.write_text("Your files have been encrypted! To decrypt your files, pay in bitcoin.")
+
+    findings = _scan_dir(monkeypatch, tmp_path)
+    titles = [f["title"] for f in findings]
+    assert "YARA match: Ransom_Note_Text" in titles
+
+
+def test_flags_cryptominer_config(tmp_path, monkeypatch):
+    f = tmp_path / "config.json"
+    f.write_text('{"url": "stratum+tcp://pool.supportxmr.com:3333", "user": "wallet"}')
+
+    findings = _scan_dir(monkeypatch, tmp_path)
+    titles = [f["title"] for f in findings]
+    assert "YARA match: Mining_Pool_Connection_String" in titles
+
+
 def test_does_not_flag_clean_file(tmp_path, monkeypatch):
     f = tmp_path / "notes.txt"
     f.write_text("just some ordinary text with nothing suspicious in it")

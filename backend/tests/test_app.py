@@ -105,6 +105,35 @@ def test_run_scan_response_includes_scan_id_and_summary(client, monkeypatch):
     assert body["summary"]
 
 
+def test_run_av_scan_only_runs_file_and_yara_scanners(client, monkeypatch):
+    calls = []
+
+    def fake_run_selected(names):
+        calls.append(tuple(names))
+        return [{"scanner": "yara_scanner", "severity": "high", "title": "t", "description": "d"}]
+
+    monkeypatch.setattr(app_module.scan_service, "run_selected", fake_run_selected)
+
+    resp = client.post("/api/scan/av")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert calls == [("file", "yara")]
+    assert body["scan_type"] == "av"
+    assert isinstance(body["scan_id"], int)
+
+
+def test_list_scans_includes_scan_type(client, monkeypatch):
+    monkeypatch.setattr(
+        app_module.scan_service,
+        "run_all",
+        lambda: [{"scanner": "x", "severity": "high", "title": "t", "description": "d"}],
+    )
+    client.post("/api/scan")
+
+    scans = client.get("/api/scans").get_json()
+    assert scans[0]["scan_type"] == "full"
+
+
 def test_get_scan_returns_the_same_scan_id_and_summary_as_the_original_run(client, monkeypatch):
     # Regression test: report_json is persisted before scan_id is known and
     # before summarize() ran, so a naive get_scan() would silently drop both

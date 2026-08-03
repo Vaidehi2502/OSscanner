@@ -2,6 +2,7 @@
 
 Endpoints:
     POST /api/scan            - run all scanners, analyze, persist, return report
+    POST /api/scan/av         - run only the antivirus scanners (file + YARA), persist, return report
     GET  /api/scans            - list past scan summaries
     GET  /api/scans/<id>       - fetch a full stored report
     GET  /api/scans/<id>/pdf   - download the report as a PDF
@@ -65,11 +66,20 @@ def _enforce_api_key():
 def _ensure_db():
     if not os.path.exists(db.DB_PATH):
         db.init_db()
+    else:
+        # Patches an already-existing scans.db up to the current schema
+        # (e.g. a scan_type column added after the file was first created).
+        db.migrate()
 
 
 @app.route("/api/scan", methods=["POST"])
 def run_scan():
     return jsonify(scan_service.run_and_persist_scan())
+
+
+@app.route("/api/scan/av", methods=["POST"])
+def run_av_scan():
+    return jsonify(scan_service.run_and_persist_av_scan())
 
 
 @app.route("/api/scans", methods=["GET"])
