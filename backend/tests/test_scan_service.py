@@ -44,3 +44,24 @@ def test_run_and_persist_av_scan_runs_only_file_and_yara_scanners(tmp_path, monk
 
     stored = scan_service.db.get_scan(report["scan_id"])
     assert stored["scan_type"] == "av"
+
+
+def test_finalize_records_reputation_for_findings_with_a_sha256(tmp_path, monkeypatch):
+    monkeypatch.setattr(scan_service.db, "DB_PATH", str(tmp_path / "scans.db"))
+    scan_service.db.init_db()
+    monkeypatch.setattr(
+        scan_service,
+        "run_all",
+        lambda: [
+            {"scanner": "file_scanner", "severity": "high", "title": "t", "description": "d",
+             "evidence": {"path": "/tmp/x", "sha256": "abc123"}},
+            {"scanner": "process_scanner", "severity": "low", "title": "t2", "description": "d2", "evidence": {}},
+        ],
+    )
+
+    scan_service.run_and_persist_scan()
+
+    entry = scan_service.db.get_file_reputation("abc123")
+    assert entry is not None
+    assert entry["risk"] == "high"
+    assert entry["detection_count"] == 1

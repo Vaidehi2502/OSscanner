@@ -4,6 +4,9 @@ import { formatTimestamp } from "./format";
 import RiskGauge from "./components/RiskGauge";
 import FindingsTable from "./components/FindingsTable";
 import ScanHistory from "./components/ScanHistory";
+import RealTimeProtection from "./components/RealTimeProtection";
+import NetworkThreatDetection from "./components/NetworkThreatDetection";
+import FileReputation from "./components/FileReputation";
 
 const LIVE_POLL_INTERVAL_MS = 10000;
 
@@ -188,6 +191,10 @@ export default function App() {
         <div className="section-title">Scan history</div>
         <ScanHistory scans={scans} selectedId={viewingScanId} onSelect={handleSelectScan} />
       </div>
+
+      <RealTimeProtection />
+      <NetworkThreatDetection />
+      <FileReputation />
     </div>
   );
 }

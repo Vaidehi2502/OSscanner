@@ -7,6 +7,15 @@ Endpoints:
     GET  /api/scans/<id>       - fetch a full stored report
     GET  /api/scans/<id>/pdf   - download the report as a PDF
     GET  /api/monitor          - background monitor status
+    GET  /api/realtime/status  - real-time protection status
+    GET  /api/realtime/events  - recent real-time detection events
+    GET  /api/quarantine       - list quarantined files
+    POST /api/quarantine/<id>/restore - restore a quarantined file
+    DELETE /api/quarantine/<id>       - permanently delete a quarantined file
+    GET  /api/network/status   - network threat detection status
+    GET  /api/network/events   - recent network threat detection events
+    GET  /api/reputation       - file reputation entries, worst risk first
+    GET  /api/reputation/<hash> - reputation for a single SHA256 hash
 """
 import hmac
 import os
@@ -16,6 +25,8 @@ from flask import Flask, jsonify, request, send_file
 from reports.pdf import generate_pdf_report
 from database import db
 import monitor
+import network_threat_detection
+import realtime_protection
 import scan_service
 
 app = Flask(__name__)
@@ -111,6 +122,70 @@ def monitor_status():
     return jsonify(monitor.status())
 
 
+@app.route("/api/realtime/status", methods=["GET"])
+def realtime_status():
+    return jsonify(realtime_protection.status())
+
+
+@app.route("/api/realtime/events", methods=["GET"])
+def realtime_events():
+    limit = request.args.get("limit", default=50, type=int)
+    return jsonify(db.list_realtime_events(limit=limit))
+
+
+@app.route("/api/quarantine", methods=["GET"])
+def list_quarantine():
+    status_filter = request.args.get("status")
+    return jsonify(db.list_quarantine(status=status_filter))
+
+
+@app.route("/api/quarantine/<int:item_id>/restore", methods=["POST"])
+def restore_quarantine(item_id):
+    try:
+        item = realtime_protection.restore_quarantine_item(item_id)
+    except (ValueError, FileExistsError) as exc:
+        return jsonify({"error": str(exc)}), 409
+    if item is None:
+        return jsonify({"error": "quarantine item not found"}), 404
+    return jsonify(item)
+
+
+@app.route("/api/quarantine/<int:item_id>", methods=["DELETE"])
+def delete_quarantine(item_id):
+    try:
+        item = realtime_protection.delete_quarantine_item(item_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    if item is None:
+        return jsonify({"error": "quarantine item not found"}), 404
+    return jsonify(item)
+
+
+@app.route("/api/network/status", methods=["GET"])
+def network_threat_status():
+    return jsonify(network_threat_detection.status())
+
+
+@app.route("/api/network/events", methods=["GET"])
+def network_threat_events():
+    limit = request.args.get("limit", default=50, type=int)
+    return jsonify(db.list_network_threat_events(limit=limit))
+
+
+@app.route("/api/reputation", methods=["GET"])
+def list_reputation():
+    limit = request.args.get("limit", default=100, type=int)
+    return jsonify(db.list_file_reputation(limit=limit))
+
+
+@app.route("/api/reputation/<hash_>", methods=["GET"])
+def get_reputation(hash_):
+    entry = db.get_file_reputation(hash_)
+    if entry is None:
+        return jsonify({"error": "no reputation on file for this hash"}), 404
+    return jsonify(entry)
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
@@ -119,6 +194,8 @@ def health():
 if __name__ == "__main__":
     db.init_db()
     monitor.start()
+    realtime_protection.start()
+    network_threat_detection.start()
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     host = os.environ.get("FLASK_HOST", "127.0.0.1")
     port = int(os.environ.get("FLASK_PORT", "5000"))

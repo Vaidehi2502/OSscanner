@@ -13,7 +13,17 @@ from database import db
 AV_SCANNERS = ("file", "yara")
 
 
+def _record_reputation(findings):
+    # Only file/yara-style findings carry a sha256 in their evidence - this
+    # is a no-op for the OS-hygiene scanners (processes, ports, users, ...).
+    for finding in findings:
+        sha256 = (finding.get("evidence") or {}).get("sha256")
+        if sha256:
+            db.record_file_reputation(sha256, finding.get("severity"))
+
+
 def _finalize(findings, scan_type):
+    _record_reputation(findings)
     report = analyze(findings)
     report["summary"] = summarize(report)
     report["scan_type"] = scan_type

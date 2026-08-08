@@ -9,6 +9,12 @@ jest.mock("./api");
 beforeEach(() => {
   api.listScans.mockResolvedValue([]);
   api.getMonitorStatus.mockResolvedValue({ enabled: false, interval_seconds: 0 });
+  api.getRealtimeStatus.mockResolvedValue({ enabled: false, watched_paths: [] });
+  api.listRealtimeEvents.mockResolvedValue([]);
+  api.listQuarantine.mockResolvedValue([]);
+  api.getNetworkThreatStatus.mockResolvedValue({ enabled: false, poll_seconds: 0 });
+  api.listNetworkThreatEvents.mockResolvedValue([]);
+  api.listFileReputation.mockResolvedValue([]);
 });
 
 afterEach(() => {

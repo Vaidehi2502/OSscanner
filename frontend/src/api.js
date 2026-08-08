@@ -36,6 +36,38 @@ export function getMonitorStatus() {
   return request("/monitor");
 }
 
+export function getRealtimeStatus() {
+  return request("/realtime/status");
+}
+
+export function listRealtimeEvents(limit = 20) {
+  return request(`/realtime/events?limit=${limit}`);
+}
+
+export function listQuarantine() {
+  return request("/quarantine");
+}
+
+export function restoreQuarantineItem(id) {
+  return request(`/quarantine/${id}/restore`, { method: "POST" });
+}
+
+export function deleteQuarantineItem(id) {
+  return request(`/quarantine/${id}`, { method: "DELETE" });
+}
+
+export function getNetworkThreatStatus() {
+  return request("/network/status");
+}
+
+export function listNetworkThreatEvents(limit = 20) {
+  return request(`/network/events?limit=${limit}`);
+}
+
+export function listFileReputation(limit = 20) {
+  return request(`/reputation?limit=${limit}`);
+}
+
 // A plain <a href> can't carry the X-API-Key header, so the PDF is fetched
 // here (with the header) and handed to the browser as a Blob download
 // instead of linking directly to the API URL.

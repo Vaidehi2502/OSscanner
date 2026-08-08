@@ -6,10 +6,42 @@ Inspects core OS state - running processes, network connections, listening
 ports, startup persistence, authentication logs, file permissions, and user
 accounts - to surface security risks and misconfigurations. Findings are
 correlated into a unified risk score, stored as historical scans in SQLite,
-and presented through a React dashboard with downloadable PDF reports.
+and presented through a React dashboard with downloadable PDF reports. An
+optional real-time protection mode watches high-risk directories and
+quarantines malicious files as they appear, instead of waiting for the next
+scan.
 
 ## Features
 
+- Optional **real-time protection** (`REALTIME_PROTECTION=1`): watches
+  Downloads, Desktop, Documents, `/tmp`, `/dev/shm`, and any removable media
+  mounted under `/media`, `/run/media`, or `/mnt` for newly created files.
+  Each new file is hashed (SHA256), matched against the same YARA rules as
+  the antivirus scan, and checked with a heuristic for newly-dropped
+  executables; anything with a high/critical finding is immediately moved
+  into a locked-down quarantine directory. The dashboard shows what's
+  currently quarantined (with one-click restore or permanent delete) and a
+  feed of recent detections, including ones that were merely alerted on
+  rather than quarantined.
+- Optional **network threat detection** (`NETWORK_THREAT_DETECTION=1`): a
+  background thread polls active connections (every `NETWORK_THREAT_POLL_SECONDS`,
+  default 5s) and flags connections to known-malicious IPs/ports
+  (`backend/rules/malicious_ips.json`, `malicious_ports.json`), new
+  connections to external (non-private) hosts, and simple port-scan
+  behavior (one remote host touching 8+ distinct local ports within 30s).
+  Detection/alerting only - it never blocks a connection or touches
+  firewall rules. The dashboard shows a live feed of recent detections
+  under "Network threat detection".
+- **SHA256 file reputation** (`GET /api/reputation`, `GET /api/reputation/<hash>`):
+  every file real-time protection observes, and every file/YARA finding
+  from a full or antivirus scan, updates a `file_reputation` row keyed by
+  SHA256 - `first_seen`/`last_seen` timestamps, a `detection_count` (how
+  many times it's been flagged, not just seen), and a `risk` level that
+  only ever ratchets up (a later clean re-scan of a previously-flagged
+  hash doesn't erase the detection). Lets you answer "have I seen this
+  exact file before, and was it ever flagged?" across scans instead of
+  each scan treating every file as new. The dashboard's "File reputation"
+  panel lists known hashes worst-risk-first, with a flagged/known count.
 - A dedicated **antivirus scan** (`POST /api/scan/av`, "Run Antivirus Scan"
   in the dashboard) that runs just the malware-detection scanners
   (dropped-executable heuristics + YARA) against dropper-prone directories
@@ -53,7 +85,7 @@ and presented through a React dashboard with downloadable PDF reports.
   deliberately viewing an older scan, in which case it leaves you there.
 - Optional `X-API-Key` auth and an origin-restricted CORS policy, since the
   API returns sensitive host data (processes, users, permissions).
-- Backend (106 pytest) and frontend (40 Jest/RTL) test suites, run on every
+- Backend (173 pytest) and frontend (62 Jest/RTL) test suites, run on every
   push/PR via GitHub Actions CI.
 
 ## Limitations
@@ -85,6 +117,50 @@ and presented through a React dashboard with downloadable PDF reports.
 - The antivirus scan (`POST /api/scan/av`) only inspects `/tmp`, `/var/tmp`,
   and `/dev/shm` (the same dropper-prone locations as the full scan's file
   scanner) - it is not a full-filesystem or on-access/real-time scanner.
+- Real-time protection (see above) only reacts to files *created or moved
+  in* after it starts - it does not scan a removable drive's existing
+  contents at the moment it's mounted, only what shows up afterward.
+  Removable-media detection is a `/proc/mounts` poll (every 10s) for
+  mountpoints under `/media`, `/run/media`, or `/mnt`, so it's Linux-only
+  and there's a brief window right after plugging in a drive where it isn't
+  watched yet.
+- Restoring a quarantined file puts it back at its original path - if that
+  path is still inside a real-time-protected directory, the watcher will
+  typically detect and re-quarantine it within seconds. Restore is meant
+  for false positives you're about to move elsewhere, not for keeping a
+  confirmed-bad file in place.
+- The quarantine/real-time-detection decision is driven by the single
+  worst finding on that one file (e.g. any YARA match defaults to `high`),
+  not the aggregate 0-100 risk score used elsewhere - that score is tuned
+  for a whole scan's worth of findings and would under-weight a single
+  file's YARA match if reused here.
+- New-file events are processed one at a time by a single worker thread, so
+  a burst of many files landing at once (e.g. extracting a large archive
+  into a watched folder) is scanned serially rather than in parallel.
+- `backend/rules/malicious_ips.json` ships with three RFC 5737 TEST-NET
+  placeholder addresses, not real threat-intel IOCs - unlike the port list
+  (port numbers are stable indicators), IP reputation goes stale fast, so
+  no real-world "malicious" IPs are bundled. Populate the file with your
+  own feed for real detection.
+- Network threat detection only reacts to connections *observed after* it
+  starts, and only ever alerts - it never kills a connection, blocks an IP,
+  or otherwise touches firewall rules. A given (remote IP, remote port,
+  local port) tuple is only alerted on once (not on every poll) for as long
+  as the process keeps running, and its port-scan tracking state is
+  in-memory only, so both reset on restart.
+- The port-scan heuristic (one remote host touching 8+ distinct local
+  ports within 30s) is a simple threshold, not real IDS-grade traffic
+  analysis - it can miss slow/low-and-slow scans and, on a busy multi-user
+  host, can false-positive on legitimate clients that happen to open many
+  short-lived connections.
+- File reputation only ever sees a hash when something already computes
+  one - real-time protection (every settled file) and file_scanner's
+  findings (evidence.sha256) during a full/AV scan. yara_scanner's
+  findings don't currently carry a hash, so a YARA-only match in a plain
+  scan (outside real-time protection) doesn't update reputation. There's
+  no local malware-family/vendor lookup behind it either - `risk` reflects
+  only what this app itself has observed and flagged, not a VirusTotal-style
+  multi-engine verdict.
 
 ## Project layout
 
@@ -94,9 +170,11 @@ backend/
   scan_service.py           Shared run-scanners-and-persist pipeline (used by app.py and monitor.py)
   monitor.py                Optional background thread for live/periodic scanning
   scanners/                 One module per check, each exposing scan() -> list[dict]
+  realtime_protection.py    Optional real-time file-watch + quarantine
+  network_threat_detection.py Optional real-time connection polling + alerting
   ai/analyzer.py            Aggregates/scores/dedupes findings into a report
   reports/pdf.py            Renders a report to PDF (falls back to .txt without reportlab)
-  rules/*.json              Signatures used by the process/port scanners
+  rules/*.json              Signatures used by the process/port/network-threat scanners
   rules/yara/*.yar          YARA rules used by yara_scanner
   utils/                    Hashing + scoring helpers
   database/                 SQLite schema + persistence (scans.db)

@@ -3,3 +3,4 @@ flask-cors==4.0.1
 psutil==6.0.0
 reportlab==4.2.2
 yara-python==4.5.4
+watchdog==6.0.0

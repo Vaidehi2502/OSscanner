@@ -134,6 +134,101 @@ def test_list_scans_includes_scan_type(client, monkeypatch):
     assert scans[0]["scan_type"] == "full"
 
 
+def test_realtime_status_disabled_by_default(client):
+    # realtime_protection.start() is only ever called from app.py's __main__
+    # block, so importing/testing the app module never actually starts it.
+    resp = client.get("/api/realtime/status")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"enabled": False, "watched_paths": []}
+
+
+def test_network_threat_status_disabled_by_default(client):
+    # Same reasoning as realtime protection above: network_threat_detection
+    # .start() only ever runs from app.py's __main__ block.
+    resp = client.get("/api/network/status")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"enabled": False, "poll_seconds": 0}
+
+
+def test_network_threat_events_starts_empty(client):
+    resp = client.get("/api/network/events")
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+def test_reputation_list_starts_empty(client):
+    resp = client.get("/api/reputation")
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+def test_reputation_lookup_returns_404_for_unknown_hash(client):
+    resp = client.get("/api/reputation/does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_reputation_lookup_returns_the_stored_entry(client):
+    app_module.db.record_file_reputation("abc123", "critical")
+
+    resp = client.get("/api/reputation/abc123")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["hash"] == "abc123"
+    assert body["risk"] == "critical"
+    assert body["detection_count"] == 1
+
+
+def test_network_threat_events_reflects_persisted_events(client):
+    app_module.db.save_network_threat_event(
+        "198.51.100.1", 4444, 51000, 123, "critical",
+        "Connection to known-malicious port 4444/198.51.100.1", "test", {"remote_ip": "198.51.100.1"},
+    )
+
+    resp = client.get("/api/network/events")
+    assert resp.status_code == 200
+    events = resp.get_json()
+    assert len(events) == 1
+    assert events[0]["remote_ip"] == "198.51.100.1"
+    assert events[0]["severity"] == "critical"
+
+
+def test_realtime_events_starts_empty(client):
+    resp = client.get("/api/realtime/events")
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+def test_quarantine_list_starts_empty(client):
+    resp = client.get("/api/quarantine")
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+def test_restore_unknown_quarantine_item_returns_404(client):
+    resp = client.post("/api/quarantine/999/restore")
+    assert resp.status_code == 404
+
+
+def test_delete_unknown_quarantine_item_returns_404(client):
+    resp = client.delete("/api/quarantine/999")
+    assert resp.status_code == 404
+
+
+def test_restore_quarantine_item_via_api(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(app_module.realtime_protection, "QUARANTINE_DIR", str(tmp_path / "quarantine_store"))
+    src = tmp_path / "shell.php"
+    src.write_text('<?php system($_POST["cmd"]); ?>')
+    monkeypatch.setattr(app_module.realtime_protection, "SETTLE_INTERVAL_SECONDS", 0)
+
+    app_module.realtime_protection._handle_candidate(str(src))
+    item_id = app_module.db.list_quarantine()[0]["id"]
+
+    resp = client.post(f"/api/quarantine/{item_id}/restore")
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "restored"
+    assert src.exists()
+
+
 def test_get_scan_returns_the_same_scan_id_and_summary_as_the_original_run(client, monkeypatch):
     # Regression test: report_json is persisted before scan_id is known and
     # before summarize() ran, so a naive get_scan() would silently drop both

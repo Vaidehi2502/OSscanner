@@ -1,0 +1,8 @@
+{
+  "_comment": "known_malicious_ips ships empty of real-world entries on purpose. Unlike malicious_ports.json (port numbers are stable, well-known indicators), IP reputation goes stale fast - a flagged IP can be reassigned to an innocent party later, so we don't bundle real-world IOCs here. Populate this file with entries from your own threat-intel feed. The three placeholders below are RFC 5737 TEST-NET documentation addresses (never live on the real internet) so the detector has something to match against out of the box; delete them once you add real entries.",
+  "known_malicious_ips": [
+    { "ip": "192.0.2.1", "desc": "RFC 5737 TEST-NET-1 placeholder - replace with real threat-intel IOCs" },
+    { "ip": "198.51.100.1", "desc": "RFC 5737 TEST-NET-2 placeholder - replace with real threat-intel IOCs" },
+    { "ip": "203.0.113.1", "desc": "RFC 5737 TEST-NET-3 placeholder - replace with real threat-intel IOCs" }
+  ]
+}
