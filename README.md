@@ -166,19 +166,19 @@ scan.
 
 ```
 backend/
-  app.py                    Flask API (POST /api/scan, GET /api/scans, ...)
-  scan_service.py           Shared run-scanners-and-persist pipeline (used by app.py and monitor.py)
-  monitor.py                Optional background thread for live/periodic scanning
-  scanners/                 One module per check, each exposing scan() -> list[dict]
-  realtime_protection.py    Optional real-time file-watch + quarantine
-  network_threat_detection.py Optional real-time connection polling + alerting
-  ai/analyzer.py            Aggregates/scores/dedupes findings into a report
-  reports/pdf.py            Renders a report to PDF (falls back to .txt without reportlab)
-  rules/*.json              Signatures used by the process/port/network-threat scanners
-  rules/yara/*.yar          YARA rules used by yara_scanner
-  utils/                    Hashing + scoring helpers
-  database/                 SQLite schema + persistence (scans.db)
-  Dockerfile                Backend image
+  app.py                         Flask API (POST /api/scan, GET /api/scans, ...)
+  scan_service.py                Shared run-scanners-and-persist pipeline (used by app.py and monitor.py)
+  monitor.py                     Optional background thread for live/periodic scanning
+  scanners/                      One module per check, each exposing scan() -> list[dict]
+  realtime_protection.py         Optional real-time file-watch + quarantine
+  network_threat_detection.py    Optional real-time connection polling + alerting
+  ai/analyzer.py                 Aggregates/scores/dedupes findings into a report
+  reports/pdf.py                 Renders a report to PDF (falls back to .txt without reportlab)
+  rules/*.json                   Signatures used by the process/port/network-threat scanners
+  rules/yara/*.yar               YARA rules used by yara_scanner
+  utils/                         Hashing + scoring helpers
+  database/                      SQLite schema + persistence (scans.db)
+  Dockerfile                     Backend image
 frontend/                   React dashboard (create-react-app style)
   Dockerfile                Multi-stage build -> nginx (used by docker-compose.yml)
   nginx.conf                Serves the built app, proxies /api/* to the backend container
@@ -402,6 +402,15 @@ REACT_APP_API_KEY=some-long-random-secret
 | GET    | `/api/scans/<id>`       | Fetch a full stored report           |
 | GET    | `/api/scans/<id>/pdf`   | Download the report (PDF or .txt fallback) |
 | GET    | `/api/monitor`          | Background monitor status (enabled, interval_seconds) |
+| GET    | `/api/realtime/status`  | Real-time protection status (enabled, watched_paths) |
+| GET    | `/api/realtime/events`  | Recent real-time detection events    |
+| GET    | `/api/quarantine`       | List quarantined files (optional `?status=`) |
+| POST   | `/api/quarantine/<id>/restore` | Restore a quarantined file back to its original path |
+| DELETE | `/api/quarantine/<id>`  | Permanently delete a quarantined file |
+| GET    | `/api/network/status`   | Network threat detection status (enabled, poll_seconds) |
+| GET    | `/api/network/events`   | Recent network threat detection events |
+| GET    | `/api/reputation`       | File reputation entries, worst risk first |
+| GET    | `/api/reputation/<hash>` | Reputation for a single SHA256 hash (404 if unseen) |
 | GET    | `/api/health`           | Health check                         |
 
 ## Extending
